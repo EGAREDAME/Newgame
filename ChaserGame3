@@ -1,0 +1,461 @@
+import processing.sound.*;
+import java.util.ArrayList;
+ArrayList<Splat> splaters = new ArrayList<Splat>();
+PImage splat;
+PImage playerImg;
+Player player;  // Changed: declare a global Player instance
+// ====================================================
+// Global Game Variables
+// ====================================================
+SoundFile soundCatch, soundSpawn, soundInvul;  // Sound effects
+
+ArrayList<Chaser> chasers;    // List holding all chaser objects
+ScoreTracker scoreTracker;    // Tracks and displays the score
+
+// Timing & invulnerability variables
+float spawnInterval = 2000;   // Interval (ms) between spawns
+float lastSpawnTime = 0;      // Last spawn time (ms)
+float meter = 0;              // Invulnerability meter
+float meterMax = 100;         // Maximum value of invulnerability meter
+boolean invulnerable = false; // Invulnerability flag
+float invulTime = 5000;       // Duration of invulnerability (ms)
+float invulStartTime = 0;     // Start time of invulnerability
+// Delta-time tracking for smooth frame updates
+int previousMillis = 0;      // Store time of previous frame
+//Drops
+//Drop d;
+
+int numDrops;
+int dropInterval;
+int activeDrops;
+
+Drop [] drops;
+void setup() {
+  // Set up the canvas size and other settings
+  size(1500, 800);
+  imageMode(CENTER);
+  rectMode(CENTER);
+  textAlign(CENTER);
+  noCursor();  // Hide system cursor
+  background(51);
+
+  // Load sound effects (make sure the files exist in the 'data' folder)
+  soundCatch = new SoundFile(this, "S_JOS_00000.wav");
+  soundSpawn = new SoundFile(this, "click.wav");
+  soundInvul = new SoundFile(this, "AV004_00.wav");
+
+  // Create a player object (using an image if available)
+
+  // Uncomment if an image file is available:
+  playerImg = loadImage("player.png");
+  player = new Player(playerImg, 100, 100);
+  splat = loadImage("splat.png");
+  // Initialize chasers list and score tracker
+  chasers = new ArrayList<Chaser>();
+  scoreTracker = new ScoreTracker();
+
+  // Store the current time for frame-based time tracking
+  previousMillis = millis();
+  //store drop
+
+  //drops = new Drop [100];
+  //for (int i = 0; i < 100; i++)
+  //{
+    
+
+
+  //}
+  //dropTimer = new Timer(dropInterval);
+  //dropTimer.start();
+}
+
+void draw() 
+{
+
+  background(51);
+  // Draw subtle background grid pattern
+  drawBackgroundGrid();
+  int currentMillis = millis();
+  float dt = currentMillis - previousMillis;  // Use float for precise delta-time
+  //int r = (int)map(scoreTracker.getScore(), 0, 100, 51, 150);
+  previousMillis = currentMillis;
+  // ---------------------------------------------------
+  // Update Score Based on Time (delta-time)
+  // ---------------------------------------------------
+  scoreTracker.update(dt);
+  // ---------------------------------------------------
+  // Decorative Background Using Nested For Loops
+  // ---------------------------------------------------
+  // Gradually change the background color based on score
+  // Spawn new chasers if needed
+  if (millis() - lastSpawnTime > spawnInterval)
+  {
+    chasers.add(new Chaser());
+    lastSpawnTime = millis();
+    soundSpawn.play();
+  }
+
+  // Update and display drops
+  for (int i = 0; i < drops.length; i++)
+  {
+    drops[i].update();
+    drops[i].display();
+  }
+  //Update and display chasers
+  for (int i = 0; chasers.length; i++)
+  {
+    chasers.get(i);
+   
+    if (invulnerable && chasers.get(active) && c.hits(mouseX, mouseY) )
+    {
+      soundCatch.play();
+      chasers.remove(i);
+
+      println("let's go:" + int(scoreTracker.getScore()));
+    }
+    chasers.add(new Chaser(mouseX, mouseY) );
+  }
+  //Display player and splat effects
+  player.display();
+  for (Splat s : splaters)
+  {
+    s.drawSplat();
+  }
+  //Manage invulnerability meter, display score, etc.
+  //(Handle meter logic and drawMeter() here.)
+}
+
+void drawMeter()
+{
+  int numSegments = 10;   // Total segments in the meter
+  int segmentWidth = 10;  // Width of each segment
+  int gap = 2;            // Gap between segments
+  int x = 10;             // Starting x-coordinate
+  int y = height - 30;    // y-coordinate for the meter
+
+  for (int i = 0; i < numSegments; i++) {
+    // Fill segments based on current meter value
+    if (meter >= ((i + 1) * (meterMax / (float)numSegments)))
+    {
+      fill(0, 0, 255);  // Filled segment color
+    } else
+    {
+      fill(50);         // Unfilled segment color
+    }
+    rect(x + i * (segmentWidth + gap), y, segmentWidth, 20);
+  }
+}
+
+// ====================================================
+// drawBackgroundGrid()
+// Creates a decorative grid pattern in the background
+// ====================================================
+
+void drawBackgroundGrid()
+{
+  stroke(255, 50);  // Light, semi-transparent stroke for grid
+  for (int i = 0; i < width; i += 50)
+  {
+    for (int j = 0; j < height; j += 50)
+    {
+      ellipse(i, j, 5, 5);  // Draw small circles in grid
+    }
+  }
+}
+
+// ====================================================
+// Player Class
+// Encapsulates player behavior and display logic
+// ====================================================
+
+class Player
+{
+  PImage img;  // Optional image for the player
+  float x, y;
+  float size = 20;  // Default size if using a shape
+
+  public Player(PImage img, float startX, float startY)
+  {
+    this.img = img;
+    x = startX;
+    y = startY;
+  }
+  // Display the player on the screen
+  public void display()
+  {
+    if (img != null)
+    {
+      imageMode(CENTER);
+      image(img, mouseX, mouseY);
+    } else
+    {
+      noStroke();
+      fill(invulnerable ? color(0, 255, 0) : color(255, 0, 0));
+      ellipse(mouseX, mouseY, size, size);
+    }
+  }
+}
+// ====================================================
+// ScoreTracker Class
+// Encapsulates score tracking and display logic
+// ====================================================
+
+class ScoreTracker
+{
+  private float score;
+
+  public ScoreTracker()
+  {
+    score = 0;
+  }
+
+  // Changed: update() now accepts a float dt for more precise score updates
+  public void update(float dt)
+  {
+    score += dt / 1000.0;
+  }
+
+  public float getScore()
+  {
+    return score;
+  }
+
+  public void display()
+  {
+    fill(255);
+    textSize(20);
+    text("Score: " + int(score), 10, 30);
+  }
+}
+
+// ====================================================
+// Chaser Class
+// Represents an enemy that chases the player
+// ====================================================
+
+class Chaser
+{
+  PVector position;
+  PVector velocity;
+  private float x, y;              // Position
+  private float xSpd, ySpd;        // Speed components for motion
+  private float accelerationFactor; // Acceleration toward player
+  private float frictionFactor = 0.9;  // Friction to slow down movement
+  private float size;              // Size of the chaser
+  private boolean active;          // Whether the chaser is active
+  private boolean large;           // True if this is a large chaser
+  private char appearance;         // Character representing the chaser
+
+  public Chaser()
+  {
+    // Spawn from a random edge
+    int side = int(random(4));
+    if (side == 0)
+    {
+      x = -20;
+      y = random(height);
+    } else if (side == 1)
+    {
+      x = width + 20;
+      y = random(height);
+    } else if (side == 2)
+    {
+      x = random(width);
+      y = -20;
+    } else
+    {
+      x = random(width);
+      y = height + 20;
+    }
+
+    // Set initial speed
+    xSpd = 0;
+    ySpd = 0;
+
+    // Randomly decide if this chaser is large (30% chance)
+    large = random(1) < 0.3;
+    if (large)
+    {
+      size = 40;
+      accelerationFactor = 0.5;
+    } else
+    {
+      size = 20;
+      accelerationFactor = 1.0;
+    }
+
+    // Choose a random appearance for the chaser
+    char[] possibleAppearances = { 'X', 'O', '@' };
+    appearance = possibleAppearances[int(random(possibleAppearances.length))];
+
+    active = true;
+  }
+
+
+  // Update chaser position and movement
+  public void update()
+  {
+      if (!active) return;
+
+    // Accelerate toward the mouse position
+    if (mouseX > x) xSpd += accelerationFactor;
+    if (mouseX < x) xSpd -= accelerationFactor;
+    if (mouseY > y) ySpd += accelerationFactor;
+    if (mouseY < y) ySpd -= accelerationFactor;
+
+    // Update position
+    x += xSpd;
+    y += ySpd;
+
+    // Apply friction to slow down movement
+    xSpd *= frictionFactor;
+    ySpd *= frictionFactor;
+    
+ 
+  }
+
+    // Display the chaser on the screen
+  public void display()
+  {
+  if (!active) return;
+  textAlign(CENTER, CENTER);
+  textSize(size);
+  fill(255, 255, 0);  // Yellow color for the chaser
+  text(appearance, x, y);
+  }
+
+  // Check if the chaser collides with the player
+  public boolean hits(float px, float py)
+  {
+  float d = dist(x, y, px, py);
+  return (d < size / 2 + 10);
+  image(img, mouseX/2, mouseY/2);
+  
+  }
+ 
+  public boolean isActive() 
+  {
+    return active;
+  }
+ 
+}
+
+class Drop
+{
+  float x, y, ySpd;
+  color col;
+ArrayList<Chaser> chasers;    // List holding all chaser objects
+  Drop(Chaser c)
+  {
+    x = c.x;
+    y = c.y;
+    ySpd = random(1, 5);
+    col = color(255, 0, 0);
+  }
+  //methods
+  void update()
+  {
+    y += ySpd;
+for (int i = 0; i < drops.length; i++)
+{
+  drops[i].update();
+    drops[i].display();
+ 
+}
+    if (y > height)
+    {
+      y = -16;
+    }
+  }
+  void display()
+  {
+    fill(col);
+    ellipse( x, y, 16, 16);
+  }
+}
+
+class Splat
+{
+  float xPos, yPos;
+  int timer = 255;
+  color col;
+  float angle;
+  float size;
+  
+  public Splat(Chaser c)
+  {
+    xPos = c.x;
+    yPos = c.y;
+    //col = c.col;
+    angle = random(TWO_PI);
+  }
+  
+  void drawSplat()
+  {
+    pushMatrix();
+    translate(xPos, yPos);
+    rotate(angle);
+    tint(col, timer);
+    image(splat, 0, 0,size, size);
+    popMatrix();
+    timer--;
+  }
+}
+
+void keyPressed()
+{
+  // Toggle pause/resume with the 'P' key
+  if (key == 'p' || key == 'P')
+  {
+    if (isLooping())
+    {
+      noLoop();
+      println("Game Paused");
+    } else
+    {
+      loop();
+      println("Game Resumed");
+    }
+  }
+
+  // Reset the game with the 'R' key
+  if (key == 'r' || key == 'R')
+  {
+    resetGame();
+    println("Game Reset");
+  }
+
+  // Detect arrow key presses (for future use)
+  if (keyCode == UP)
+  {
+    println("UP key pressed");
+  } else if (keyCode == DOWN)
+  {
+    println("DOWN key pressed");
+  } else if (keyCode == LEFT)
+  {
+    println("LEFT key pressed");
+  } else if (keyCode == RIGHT)
+  {
+    println("RIGHT key pressed");
+  }
+}
+
+void keyReleased()
+{
+  println("Key released: " + key);
+}
+
+// ====================================================
+// resetGame()
+// Resets game variables and restarts the game
+// ====================================================
+void resetGame()
+{
+  chasers = new ArrayList<Chaser>();
+  scoreTracker = new ScoreTracker();
+  meter = 0;
+  invulnerable = false;
+  lastSpawnTime = millis();
+  loop();  // Restart the game loop
+}
